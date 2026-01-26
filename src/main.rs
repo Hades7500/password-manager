@@ -1,5 +1,5 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, Salt, SaltString},
+    password_hash::{rand_core::OsRng, SaltString},
     Argon2,
 };
 use std::{
@@ -125,5 +125,6 @@ fn decrypt(encrypted_data: Entry, password: &str) {
     let nonce = Nonce::from_slice(&nonce);
     let cipher = Aes256Gcm::new(key);
     let op = cipher.decrypt(nonce, data.as_slice()).unwrap();
-    println!("{op:?}");
+    let plaintext= str::from_utf8(&op).unwrap();
+    println!("{plaintext}");
 }
