@@ -3,11 +3,10 @@ use argon2::{
     Argon2,
 };
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     io::{self, Write},
 };
-
-use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, Key, KeyInit, Nonce};
+use aes_gcm::{AeadCore, Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
 use rpassword::prompt_password;
 
 enum StatusCode {
@@ -16,14 +15,21 @@ enum StatusCode {
     IncorrectInput(String),
 }
 
+#[derive(Debug)]
 struct Entry {
     data: Vec<u8>,
     nonce: Vec<u8>,
     salt: SaltString,
 }
 
+struct Entry {}
+
 fn main() {
-    encrypt(b"1235", "password");
+    let username = "abhinav";
+    let pass = "1235";
+    let enc = encrypt(format!("{username}\n{pass}").as_bytes(), "password");
+    let de = decrypt(enc, "password");
+    println!("{de}");
     return;
     let mut home = std::env::home_dir().unwrap();
     home.push(".local/share/hsv");
@@ -33,7 +39,7 @@ fn main() {
         println!("Welcome to Password Manager!");
         println!("What would you like to do?");
         println!("1. Create a new password vault");
-        println!("2. Enter a vault");
+        println!("2. Open a vault");
         println!("Quit (enter q to quit)");
         io::stdin()
             .read_line(&mut input)
@@ -84,7 +90,7 @@ fn create_vault() {
     }
 }
 
-fn encrypt(data: &[u8], password: &str) {
+fn encrypt(data: &[u8], password: &str) -> Entry {
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
     let mut password_hash: [u8; 32] = [0u8; 32];
@@ -98,18 +104,18 @@ fn encrypt(data: &[u8], password: &str) {
     let key: &Key<Aes256Gcm> = &password_hash.into();
     let cipher = Aes256Gcm::new(&key);
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-    let ciphertext = match cipher.encrypt(&nonce, data) {
+    match cipher.encrypt(&nonce, data) {
         Ok(encrypted_data) => Entry {
             data: encrypted_data,
             nonce: nonce.to_vec(),
-            salt: salt,
+            salt,
         },
         Err(err) => panic!("Unable to encrypt data: {err}"),
-    };
-    decrypt(ciphertext, password);
+    }
+    // decrypt(ciphertext, password);
 }
 
-fn decrypt(encrypted_data: Entry, password: &str) {
+fn decrypt(encrypted_data: Entry, password: &str) -> String {
     let argon2 = Argon2::default();
     let mut password_hash: [u8; 32] = [0u8; 32];
     argon2
@@ -125,6 +131,16 @@ fn decrypt(encrypted_data: Entry, password: &str) {
     let nonce = Nonce::from_slice(&nonce);
     let cipher = Aes256Gcm::new(key);
     let op = cipher.decrypt(nonce, data.as_slice()).unwrap();
-    let plaintext= str::from_utf8(&op).unwrap();
-    println!("{plaintext}");
+    let plaintext = str::from_utf8(&op).unwrap();
+    plaintext.to_owned()
+}
+
+fn read(path: &str) {
+    let file_content: String = fs::read_to_string(path).unwrap();
+
+}
+
+fn write(path: &str, data: Entry) {
+    let mut file = OpenOptions::new().append(true).open(path).unwrap();
+    writeln!(file, "{data:?}");
 }
