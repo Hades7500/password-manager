@@ -19,12 +19,6 @@ struct Entry {
 }
 
 fn main() {
-    let username = "abhinav";
-    let pass = "1235";
-    let enc = encrypt(format!("{username}\n{pass}").as_bytes(), "password", "asd");
-    let de = decrypt(enc, "password");
-    println!("{de}");
-    return;
     let mut home = std::env::home_dir().unwrap();
     home.push(".local/share/hsv");
     let _ = fs::create_dir(home);
@@ -39,11 +33,11 @@ fn main() {
             .read_line(&mut input)
             .expect("Failed to read line");
 
-        match input.as_str() {
+        match input.as_str().trim() {
             "1" => create_vault(),
             "2" => get_pass(),
             "q" => break,
-            err => println!("{err}"),
+            err => println!("{err:?}"),
         }
     }
 }
