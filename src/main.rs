@@ -1,13 +1,13 @@
+use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, Key, KeyInit, Nonce};
 use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
+    password_hash::{self, rand_core::OsRng, SaltString},
     Argon2,
 };
+use rpassword::prompt_password;
 use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
 };
-use aes_gcm::{AeadCore, Aes256Gcm, Key, KeyInit, Nonce, aead::Aead};
-use rpassword::prompt_password;
 
 enum StatusCode {
     CreateVault,
@@ -21,8 +21,6 @@ struct Entry {
     nonce: Vec<u8>,
     salt: SaltString,
 }
-
-struct Entry {}
 
 fn main() {
     let username = "abhinav";
@@ -39,28 +37,18 @@ fn main() {
         println!("Welcome to Password Manager!");
         println!("What would you like to do?");
         println!("1. Create a new password vault");
-        println!("2. Open a vault");
+        println!("2. Retreive Password");
         println!("Quit (enter q to quit)");
         io::stdin()
             .read_line(&mut input)
             .expect("Failed to read line");
-        match read_input(input.trim()) {
-            StatusCode::CreateVault => (),
-            StatusCode::Quit => break,
-            StatusCode::IncorrectInput(err) => println!("Incorrect Option Selected {err}"),
-        }
-    }
-}
 
-fn read_input(input: &str) -> StatusCode {
-    match input {
-        "1" => {
-            create_vault();
-            StatusCode::CreateVault
+        match input.as_str() {
+            "1" => create_vault(),
+            "2" => get_pass(),
+            "q" => break,
+            err => println!("{err}"),
         }
-        "2" => todo!(),
-        "q" => StatusCode::Quit,
-        err => StatusCode::IncorrectInput(String::from(err)),
     }
 }
 
@@ -90,19 +78,24 @@ fn create_vault() {
     }
 }
 
+fn get_pass() {
+    todo!()
+}
+
+fn gen_hash(password: &str, salt: &[u8]) -> [u8; 32] {
+    let argon2 = Argon2::default();
+    let mut hash: [u8; 32] = [0u8; 32];
+    argon2
+        .hash_password_into(password.as_bytes(), salt, &mut hash)
+        .unwrap();
+    hash
+}
+
 fn encrypt(data: &[u8], password: &str) -> Entry {
     let salt = SaltString::generate(&mut OsRng);
-    let argon2 = Argon2::default();
-    let mut password_hash: [u8; 32] = [0u8; 32];
-    argon2
-        .hash_password_into(
-            password.as_bytes(),
-            salt.as_str().as_bytes(),
-            &mut password_hash,
-        )
-        .unwrap();
+    let password_hash: [u8; 32] = gen_hash(password, salt.as_str().as_bytes());
     let key: &Key<Aes256Gcm> = &password_hash.into();
-    let cipher = Aes256Gcm::new(&key);
+    let cipher = Aes256Gcm::new(key);
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
     match cipher.encrypt(&nonce, data) {
         Ok(encrypted_data) => Entry {
@@ -112,19 +105,10 @@ fn encrypt(data: &[u8], password: &str) -> Entry {
         },
         Err(err) => panic!("Unable to encrypt data: {err}"),
     }
-    // decrypt(ciphertext, password);
 }
 
 fn decrypt(encrypted_data: Entry, password: &str) -> String {
-    let argon2 = Argon2::default();
-    let mut password_hash: [u8; 32] = [0u8; 32];
-    argon2
-        .hash_password_into(
-            password.as_bytes(),
-            encrypted_data.salt.as_str().as_bytes(),
-            &mut password_hash,
-        )
-        .unwrap();
+    let password_hash: [u8; 32] = gen_hash(password, encrypted_data.salt.as_str().as_bytes());
     let key: &Key<Aes256Gcm> = &password_hash.into();
     let nonce = encrypted_data.nonce;
     let data = encrypted_data.data;
@@ -137,7 +121,6 @@ fn decrypt(encrypted_data: Entry, password: &str) -> String {
 
 fn read(path: &str) {
     let file_content: String = fs::read_to_string(path).unwrap();
-
 }
 
 fn write(path: &str, data: Entry) {
