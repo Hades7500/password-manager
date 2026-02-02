@@ -1,31 +1,27 @@
 use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, Key, KeyInit, Nonce};
 use argon2::{
-    password_hash::{self, rand_core::OsRng, SaltString},
+    password_hash::{rand_core::OsRng, SaltString},
     Argon2,
 };
 use rpassword::prompt_password;
+use serde_derive::{Deserialize, Serialize};
 use std::{
     fs::{self, OpenOptions},
     io::{self, Write},
 };
 
-enum StatusCode {
-    CreateVault,
-    Quit,
-    IncorrectInput(String),
-}
-
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Entry {
+    name: String,
     data: Vec<u8>,
     nonce: Vec<u8>,
-    salt: SaltString,
+    salt: Vec<u8>,
 }
 
 fn main() {
     let username = "abhinav";
     let pass = "1235";
-    let enc = encrypt(format!("{username}\n{pass}").as_bytes(), "password");
+    let enc = encrypt(format!("{username}\n{pass}").as_bytes(), "password", "asd");
     let de = decrypt(enc, "password");
     println!("{de}");
     return;
@@ -91,27 +87,31 @@ fn gen_hash(password: &str, salt: &[u8]) -> [u8; 32] {
     hash
 }
 
-fn encrypt(data: &[u8], password: &str) -> Entry {
+fn encrypt(data: &[u8], password: &str, name: &str) -> Entry {
     let salt = SaltString::generate(&mut OsRng);
-    let password_hash: [u8; 32] = gen_hash(password, salt.as_str().as_bytes());
+    let salt = salt.as_str().as_bytes();
+
+    let password_hash: [u8; 32] = gen_hash(password, salt);
     let key: &Key<Aes256Gcm> = &password_hash.into();
     let cipher = Aes256Gcm::new(key);
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
+
     match cipher.encrypt(&nonce, data) {
         Ok(encrypted_data) => Entry {
+            name: name.to_owned(),
             data: encrypted_data,
             nonce: nonce.to_vec(),
-            salt,
+            salt: salt.to_vec(),
         },
         Err(err) => panic!("Unable to encrypt data: {err}"),
     }
 }
 
 fn decrypt(encrypted_data: Entry, password: &str) -> String {
-    let password_hash: [u8; 32] = gen_hash(password, encrypted_data.salt.as_str().as_bytes());
+    let password_hash: [u8; 32] = gen_hash(password, &encrypted_data.salt);
     let key: &Key<Aes256Gcm> = &password_hash.into();
-    let nonce = encrypted_data.nonce;
     let data = encrypted_data.data;
+    let nonce = encrypted_data.nonce;
     let nonce = Nonce::from_slice(&nonce);
     let cipher = Aes256Gcm::new(key);
     let op = cipher.decrypt(nonce, data.as_slice()).unwrap();
@@ -125,5 +125,5 @@ fn read(path: &str) {
 
 fn write(path: &str, data: Entry) {
     let mut file = OpenOptions::new().append(true).open(path).unwrap();
-    writeln!(file, "{data:?}");
+    writeln!(file, "{data:?}").unwrap();
 }
