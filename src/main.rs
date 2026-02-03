@@ -19,6 +19,8 @@ struct Entry {
 }
 
 fn main() {
+    read("/home/abhinav/.local/share/hsv/1.hsv");
+    return;
     let mut home = std::env::home_dir().unwrap();
     home.push(".local/share/hsv");
     let _ = fs::create_dir(home);
@@ -81,7 +83,7 @@ fn gen_hash(password: &str, salt: &[u8]) -> [u8; 32] {
     hash
 }
 
-fn encrypt(data: &[u8], password: &str, name: &str) -> Entry {
+fn encrypt(data: &[u8], password: &str, name: &str) {
     let salt = SaltString::generate(&mut OsRng);
     let salt = salt.as_str().as_bytes();
 
@@ -90,7 +92,7 @@ fn encrypt(data: &[u8], password: &str, name: &str) -> Entry {
     let cipher = Aes256Gcm::new(key);
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
 
-    match cipher.encrypt(&nonce, data) {
+    let encrypted = match cipher.encrypt(&nonce, data) {
         Ok(encrypted_data) => Entry {
             name: name.to_owned(),
             data: encrypted_data,
@@ -98,7 +100,9 @@ fn encrypt(data: &[u8], password: &str, name: &str) -> Entry {
             salt: salt.to_vec(),
         },
         Err(err) => panic!("Unable to encrypt data: {err}"),
-    }
+    };
+
+    write("/home/abhinav/.local/share/hsv/1.hsv", encrypted);
 }
 
 fn decrypt(encrypted_data: Entry, password: &str) -> String {
@@ -115,9 +119,13 @@ fn decrypt(encrypted_data: Entry, password: &str) -> String {
 
 fn read(path: &str) {
     let file_content: String = fs::read_to_string(path).unwrap();
+    println!("{file_content}");
+    let entries: Vec<Entry> = serde_json::from_str(&file_content).expect("An error occured");
+    println!("{entries:?}");
 }
 
 fn write(path: &str, data: Entry) {
     let mut file = OpenOptions::new().append(true).open(path).unwrap();
-    writeln!(file, "{data:?}").unwrap();
+    let data_json: String = serde_json::to_string(&data).unwrap();
+    writeln!(file, "{data_json}\n").unwrap();
 }
