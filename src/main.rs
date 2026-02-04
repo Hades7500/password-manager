@@ -6,7 +6,7 @@ use argon2::{
 use rpassword::prompt_password;
 use serde_derive::{Deserialize, Serialize};
 use std::{
-    fs::{self, OpenOptions},
+    fs,
     io::{self, Write},
 };
 
@@ -19,7 +19,7 @@ struct Entry {
 }
 
 fn main() {
-    read("/home/abhinav/.local/share/hsv/1.hsv");
+    read_entries("/home/abhinav/.local/share/hsv/1.hsv");
     return;
     let mut home = std::env::home_dir().unwrap();
     home.push(".local/share/hsv");
@@ -117,15 +117,15 @@ fn decrypt(encrypted_data: Entry, password: &str) -> String {
     plaintext.to_owned()
 }
 
-fn read(path: &str) {
+fn read_entries(path: &str) -> Vec<Entry> {
     let file_content: String = fs::read_to_string(path).unwrap();
     println!("{file_content}");
-    let entries: Vec<Entry> = serde_json::from_str(&file_content).expect("An error occured");
-    println!("{entries:?}");
+    serde_json::from_str(&file_content).expect("An error occured")
 }
 
 fn write(path: &str, data: Entry) {
-    let mut file = OpenOptions::new().append(true).open(path).unwrap();
-    let data_json: String = serde_json::to_string(&data).unwrap();
-    writeln!(file, "{data_json}\n").unwrap();
+    let mut entries: Vec<Entry> = read_entries(path);
+    entries.push(data);
+    let entries_string = serde_json::to_string(&entries).unwrap();
+    fs::write(path, entries_string).unwrap();
 }
