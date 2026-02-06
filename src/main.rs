@@ -8,6 +8,7 @@ use serde_derive::{Deserialize, Serialize};
 use std::{
     fs,
     io::{self, Write},
+    path::PathBuf,
 };
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,7 +37,7 @@ fn main() {
             .expect("Failed to read line");
 
         match input.as_str().trim() {
-            "1" => create_vault(),
+            "1" => create_vault(&home),
             "2" => get_pass(),
             "q" => break,
             err => println!("{err:?}"),
@@ -44,7 +45,7 @@ fn main() {
     }
 }
 
-fn create_vault() {
+fn create_vault(home: &PathBuf) {
     let mut name: String = String::new();
     println!("Creating a new vault");
     print!("Enter a Vault Name: ");
@@ -60,8 +61,8 @@ fn create_vault() {
         pass if pass == m_pass => (),
         _ => println!("Passwords do not match"),
     }
-    let mut path = std::env::home_dir().unwrap();
-    path.push(format!(".local/share/hsv/{}.hsv", name.trim()));
+    let mut path = home.clone();
+    path.push(format!("{}.hsv", name.trim()));
 
     match fs::exists(&path) {
         Ok(true) => println!("A vault with this name already exsists"),
@@ -70,8 +71,9 @@ fn create_vault() {
     }
 }
 
-fn get_pass() {
-    todo!()
+fn get_pass(vault_name: &str, home: &PathBuf) {
+    let path: PathBuf = home.clone();
+    path.push(format!("{}.hsv", vault_name.trim()));
 }
 
 fn gen_hash(password: &str, salt: &[u8]) -> [u8; 32] {
