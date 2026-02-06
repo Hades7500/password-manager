@@ -72,7 +72,7 @@ fn create_vault(home: &PathBuf) {
 }
 
 fn get_pass(vault_name: &str, home: &PathBuf) {
-    let path: PathBuf = home.clone();
+    let mut path: PathBuf = home.clone();
     path.push(format!("{}.hsv", vault_name.trim()));
 }
 
